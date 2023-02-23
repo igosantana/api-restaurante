@@ -3,6 +3,7 @@ package controllers
 import (
 	"api-restaurante/initializers"
 	"api-restaurante/models"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -13,7 +14,6 @@ import (
 )
 
 func Signup(c *gin.Context) {
-	// Get the email/pass of req body
 	var body struct {
 		Name     string
 		Email    string
@@ -26,7 +26,6 @@ func Signup(c *gin.Context) {
 		})
 		return
 	}
-	// hash the password
 	hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), 10)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -34,7 +33,6 @@ func Signup(c *gin.Context) {
 		})
 		return
 	}
-	// create the user
 	user := models.User{
 		Name:     body.Name,
 		Email:    body.Email,
@@ -53,7 +51,6 @@ func Signup(c *gin.Context) {
 }
 
 func Login(c *gin.Context) {
-	// get the email and password
 	var body struct {
 		Email    string
 		Password string
@@ -65,7 +62,6 @@ func Login(c *gin.Context) {
 		})
 		return
 	}
-	// get the user with email
 	var user models.User
 	result := initializers.DB.First(&user, "email = ?", body.Email)
 	if result.RowsAffected == 0 {
@@ -74,7 +70,6 @@ func Login(c *gin.Context) {
 		})
 		return
 	}
-	// compare hash
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -82,7 +77,6 @@ func Login(c *gin.Context) {
 		})
 		return
 	}
-	// return cookie
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": user.ID,
 		"exp": time.Now().Add(time.Hour * 24 * 30).Unix(),
@@ -95,4 +89,86 @@ func Login(c *gin.Context) {
 		})
 	}
 	c.SetCookie("Authorization", tokenString, 3600*24*30, "", "", false, true)
+}
+
+func UpdateUser(c *gin.Context) {
+	var user models.User
+	id := c.Param("id")
+	result := initializers.DB.First(&user, "id = ?", id)
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "User not found",
+		})
+		return
+	}
+	var body struct {
+		Name     string
+		Email    string
+		Password string
+	}
+	err := c.Bind(&body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Fail to read body",
+		})
+	}
+	if body.Name != "" {
+		user.Name = body.Name
+	}
+	if body.Email != "" {
+		user.Email = body.Email
+	}
+	if body.Password != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), 10)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Failed to hash password",
+			})
+			return
+		}
+		user.Password = string(hash)
+	}
+	initializers.DB.Save(&user)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User update",
+	})
+}
+
+func DeleteUser(c *gin.Context) {
+	var user models.User
+	id := c.Param("id")
+	result := initializers.DB.First(&user, "id = ?", id)
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "User not found",
+		})
+		return
+	}
+	initializers.DB.Delete(&user)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User deleted",
+	})
+}
+
+func GetUser(c *gin.Context) {
+	var user models.User
+	id := c.Param("id")
+	result := initializers.DB.First(&user, "id = ?", id)
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "User not found",
+		})
+		return
+	}
+	var getUser struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	}
+	getUser.ID = fmt.Sprintf("%v", user.ID)
+	getUser.Name = user.Name
+	getUser.Email = user.Email
+	c.JSON(http.StatusOK, gin.H{
+		"user": &getUser,
+	})
 }
