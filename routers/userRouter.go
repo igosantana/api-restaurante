@@ -15,5 +15,8 @@ func HandleRouters() {
 	r.DELETE("/user/:id", middlewares.AuthIsUser, controllers.DeleteUser)
 	r.GET("/user/:id", middlewares.AuthIsUser, controllers.GetUser)
 	r.POST("/product", controllers.CreateProduct)
+	r.PATCH("/product/:id", controllers.UpdateProduct)
+	r.GET("/product", controllers.GetAllProducts)
+	r.DELETE("/product/:id", controllers.DeleteProduct)
 	r.Run()
 }

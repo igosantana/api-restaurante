@@ -130,7 +130,7 @@ func UpdateUser(c *gin.Context) {
 	}
 	initializers.DB.Save(&user)
 	c.JSON(http.StatusOK, gin.H{
-		"message": "User update",
+		"message": "ok",
 	})
 }
 
