@@ -4,6 +4,7 @@ import (
 	"api-restaurante/awsBucket"
 	"api-restaurante/initializers"
 	"api-restaurante/models"
+	"api-restaurante/utils"
 	"errors"
 	"log"
 	"mime/multipart"
@@ -23,30 +24,15 @@ type form struct {
 	File        *multipart.FileHeader `form:"file" binding:"required"`
 }
 
-type ErrorMsg struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
-}
-
-func getErrorMsg(fe validator.FieldError) string {
-	switch fe.Tag() {
-	case "required":
-		return "This field is required"
-	case "max":
-		return "Should be max " + fe.Param()
-	}
-	return "Unknown error"
-}
-
 func CreateProduct(c *gin.Context) {
 	var form form
 	err := c.ShouldBind(&form)
 	if err != nil {
 		var ve validator.ValidationErrors
 		if errors.As(err, &ve) {
-			out := make([]ErrorMsg, len(ve))
+			out := make([]utils.ErrorMsg, len(ve))
 			for i, fe := range ve {
-				out[i] = ErrorMsg{fe.Field(), getErrorMsg(fe)}
+				out[i] = utils.ErrorMsg{Field: fe.Field(), Message: utils.GetErrorMsg(fe)}
 			}
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"errors": out})
 		}
@@ -104,9 +90,9 @@ func UpdateProduct(c *gin.Context) {
 	if err != nil {
 		var ve validator.ValidationErrors
 		if errors.As(err, &ve) {
-			out := make([]ErrorMsg, len(ve))
+			out := make([]utils.ErrorMsg, len(ve))
 			for i, fe := range ve {
-				out[i] = ErrorMsg{fe.Field(), getErrorMsg(fe)}
+				out[i] = utils.ErrorMsg{Field: fe.Field(), Message: utils.GetErrorMsg(fe)}
 			}
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"errors": out})
 		}

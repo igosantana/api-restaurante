@@ -3,48 +3,57 @@ package controllers
 import (
 	"api-restaurante/initializers"
 	"api-restaurante/models"
-	"fmt"
+	"api-restaurante/utils"
+	"errors"
+	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
+type toCreateUser struct {
+	Name     string `json:"name" binding:"max=110"`
+	Email    string `json:"email" binding:"max=110,email"`
+	Password string `json:"password"`
+}
+
 func Signup(c *gin.Context) {
-	var body struct {
-		Name     string
-		Email    string
-		Password string
-	}
-	err := c.Bind(&body)
+	var user models.User
+	var toCreateUser toCreateUser
+	err := c.ShouldBind(&toCreateUser)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Failed to read body",
-		})
+		var ve validator.ValidationErrors
+		if errors.As(err, &ve) {
+			out := make([]utils.ErrorMsg, len(ve))
+			for i, fe := range ve {
+				out[i] = utils.ErrorMsg{Field: fe.Field(), Message: utils.GetErrorMsg(fe)}
+			}
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"errors": out})
+		}
 		return
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), 10)
+	result := initializers.DB.First(&user, "email = ?", toCreateUser.Email)
+	if result.RowsAffected > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Email already exists.",
+		})
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(toCreateUser.Password), 10)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Failed to hash password",
 		})
 		return
 	}
-	user := models.User{
-		Name:     body.Name,
-		Email:    body.Email,
-		Password: string(hash),
-	}
-	result := initializers.DB.Create(&user)
-	if result.Error != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Failed to create user",
-		})
-		return
-	}
+	user.Name = toCreateUser.Name
+	user.Email = toCreateUser.Email
+	user.Password = string(hash)
+	initializers.DB.Create(&user)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "User created!",
 	})
@@ -52,10 +61,10 @@ func Signup(c *gin.Context) {
 
 func Login(c *gin.Context) {
 	var body struct {
-		Email    string
-		Password string
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
-	err := c.Bind(&body)
+	err := c.ShouldBind(&body)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Failed to login",
@@ -91,8 +100,27 @@ func Login(c *gin.Context) {
 	c.SetCookie("Authorization", tokenString, 3600*24*30, "", "", false, true)
 }
 
+type userUpdate struct {
+	Name     string `json:"name,omitempty"`
+	Email    string `json:"email,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
+func (u *userUpdate) toModel() *models.User {
+	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), 10)
+	if err != nil {
+		log.Println("Decrypt error update")
+	}
+	return &models.User{
+		Name:     u.Name,
+		Email:    u.Email,
+		Password: string(hash),
+	}
+}
+
 func UpdateUser(c *gin.Context) {
 	var user models.User
+	var userUpdate userUpdate
 	id := c.Param("id")
 	result := initializers.DB.First(&user, "id = ?", id)
 	if result.RowsAffected == 0 {
@@ -101,34 +129,13 @@ func UpdateUser(c *gin.Context) {
 		})
 		return
 	}
-	var body struct {
-		Name     string
-		Email    string
-		Password string
-	}
-	err := c.Bind(&body)
+	err := c.ShouldBind(&userUpdate)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Fail to read body",
 		})
 	}
-	if body.Name != "" {
-		user.Name = body.Name
-	}
-	if body.Email != "" {
-		user.Email = body.Email
-	}
-	if body.Password != "" {
-		hash, err := bcrypt.GenerateFromPassword([]byte(body.Password), 10)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Failed to hash password",
-			})
-			return
-		}
-		user.Password = string(hash)
-	}
-	initializers.DB.Save(&user)
+	initializers.DB.Model(&user).Updates(userUpdate.toModel())
 	c.JSON(http.StatusOK, gin.H{
 		"message": "ok",
 	})
@@ -145,9 +152,6 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 	initializers.DB.Delete(&user)
-	c.JSON(http.StatusOK, gin.H{
-		"message": "User deleted",
-	})
 }
 
 func GetUser(c *gin.Context) {
@@ -160,15 +164,7 @@ func GetUser(c *gin.Context) {
 		})
 		return
 	}
-	var getUser struct {
-		ID    string `json:"id"`
-		Name  string `json:"name"`
-		Email string `json:"email"`
-	}
-	getUser.ID = fmt.Sprintf("%v", user.ID)
-	getUser.Name = user.Name
-	getUser.Email = user.Email
 	c.JSON(http.StatusOK, gin.H{
-		"user": &getUser,
+		"user": user.UserToUser(),
 	})
 }
