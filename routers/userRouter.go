@@ -9,14 +9,19 @@ import (
 
 func HandleRouters() {
 	r := gin.Default()
-	r.POST("/signup", controllers.Signup)
 	r.POST("/login", controllers.Login)
-	r.PATCH("/user/:id", middlewares.AuthIsUser, controllers.UpdateUser)
-	r.DELETE("/user/:id", middlewares.AuthIsUser, controllers.DeleteUser)
-	r.GET("/user/:id", middlewares.AuthIsUser, controllers.GetUser)
-	r.POST("/product", controllers.CreateProduct)
-	r.PATCH("/product/:id", controllers.UpdateProduct)
-	r.GET("/product", controllers.GetAllProducts)
-	r.DELETE("/product/:id", controllers.DeleteProduct)
+	// User routers
+	user := r.Group("/user")
+	user.POST("/", controllers.CreateUser)
+	user.Use(middlewares.ValidateToken(), middlewares.IsOwnerOrAdmin())
+	user.PATCH("/:id", controllers.UpdateUser)
+	user.DELETE("/:id", controllers.DeleteUser)
+	user.GET("/:id", controllers.GetUser)
+	// Product routers
+	product := r.Group("/product")
+	product.POST("/", controllers.CreateProduct)
+	product.PATCH("/:id", controllers.UpdateProduct)
+	product.GET("/", controllers.GetAllProducts)
+	product.DELETE("/:id", controllers.DeleteProduct)
 	r.Run()
 }

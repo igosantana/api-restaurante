@@ -3,28 +3,28 @@ package controllers
 import (
 	"api-restaurante/initializers"
 	"api-restaurante/models"
+	"api-restaurante/token"
 	"api-restaurante/utils"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type toCreateUser struct {
-	Name     string `json:"name" binding:"max=110"`
-	Email    string `json:"email" binding:"max=110,email"`
-	Password string `json:"password"`
-}
+const (
+	Admin    = "Admin"
+	Owner    = "Owner"
+	Customer = "Customer"
+)
 
-func Signup(c *gin.Context) {
+func CreateUser(c *gin.Context) {
 	var user models.User
-	var toCreateUser toCreateUser
+	var toCreateUser models.ToCreateUser
 	err := c.ShouldBind(&toCreateUser)
 	if err != nil {
 		var ve validator.ValidationErrors
@@ -42,6 +42,7 @@ func Signup(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Email already exists.",
 		})
+		return
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(toCreateUser.Password), 10)
 	if err != nil {
@@ -50,54 +51,69 @@ func Signup(c *gin.Context) {
 		})
 		return
 	}
+	if toCreateUser.Email == "igo@admin.com" {
+		user.Roles = append(user.Roles, Admin)
+	} else if toCreateUser.Email == "leo@email.com" {
+		user.Roles = append(user.Roles, Owner)
+	} else {
+		user.Roles = append(user.Roles, Customer)
+	}
 	user.Name = toCreateUser.Name
 	user.Email = toCreateUser.Email
 	user.Password = string(hash)
 	initializers.DB.Create(&user)
-	c.JSON(http.StatusOK, gin.H{
+	c.JSON(http.StatusCreated, gin.H{
 		"message": "User created!",
 	})
 }
 
 func Login(c *gin.Context) {
 	var body struct {
-		Email    string `json:"email"`
+		Email    string `json:"email" binding:"email"`
 		Password string `json:"password"`
 	}
-	err := c.ShouldBind(&body)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Failed to login",
+	if err := c.ShouldBind(&body); err != nil {
+		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
+		errors = append(errors, models.ErrorDetail{
+			ErrorType:    models.ErrorTypeValidation,
+			ErrorMessage: fmt.Sprintf("%v", err),
 		})
-		return
+		badRequest(c, http.StatusBadRequest, "invalid request", errors)
 	}
 	var user models.User
 	result := initializers.DB.First(&user, "email = ?", body.Email)
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Invalid email or password",
+		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
+		errors = append(errors, models.ErrorDetail{
+			ErrorType:    models.ErrorTypeValidation,
+			ErrorMessage: fmt.Sprintf("%v", "Invalid email or password"),
 		})
-		return
+		badRequest(c, http.StatusBadRequest, "Invalid email or password", errors)
 	}
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password))
+	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid email or password",
+		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
+		errors = append(errors, models.ErrorDetail{
+			ErrorType:    models.ErrorTypeValidation,
+			ErrorMessage: fmt.Sprintf("%v", err),
 		})
-		return
+		badRequest(c, http.StatusBadRequest, "Invalid email or password", errors)
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": user.ID,
-		"exp": time.Now().Add(time.Hour * 24 * 30).Unix(),
-	})
-	secretKey := os.Getenv("SECRET_KEY")
-	tokenString, err := token.SignedString([]byte(secretKey))
+	var claims = &models.JwtClaims{}
+	claims.UserId = user.ID.String()
+	claims.Roles = user.Roles
+	var tokenCreationTime = time.Now().UTC()
+	var expirationTime = tokenCreationTime.Add(time.Duration(2) * time.Hour)
+	tokenString, err := token.GenerateToken(claims, expirationTime)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Failed to create  token",
+		badRequest(c, http.StatusBadRequest, "Error in generating token", []models.ErrorDetail{
+			{
+				ErrorType:    models.ErrorTypeError,
+				ErrorMessage: err.Error(),
+			},
 		})
 	}
-	c.SetCookie("Authorization", tokenString, 3600*24*30, "", "", false, true)
+	c.SetCookie("Authorization", tokenString, 3600*2, "", "", false, true)
 }
 
 type userUpdate struct {

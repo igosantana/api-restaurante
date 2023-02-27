@@ -1,85 +1,83 @@
 package middlewares
 
 import (
-	"api-restaurante/initializers"
 	"api-restaurante/models"
-	"fmt"
+	"api-restaurante/token"
 	"net/http"
-	"os"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v4"
 )
 
-func RequireAuth(c *gin.Context) {
-	// Get the cookie
-	tokenString, err := c.Cookie("Authorization")
-	if err != nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
-	}
-	// Decode and validate
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Don't forget to validate the alg is what you expect:
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-		}
-		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return []byte(os.Getenv("SECRET_KEY")), nil
+func ReturnUnauthorized(c *gin.Context) {
+	c.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
+		Error: []models.ErrorDetail{
+			{
+				ErrorType:    models.ErrorTypeUnauthorized,
+				ErrorMessage: "You are not authorized to access this path",
+			},
+		},
+		Status:  http.StatusUnauthorized,
+		Message: "Unauthorized access",
 	})
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		// check the exp
-		if float64(time.Now().Unix()) > claims["exp"].(float64) {
+}
+
+func ValidateToken() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString, err := c.Cookie("Authorization")
+		if err != nil {
 			c.AbortWithStatus(http.StatusUnauthorized)
 		}
-		// Find the user Token
-		var user models.User
-		result := initializers.DB.First(&user, "id = ?", claims["sub"])
-		if result.RowsAffected == 0 {
-			c.AbortWithStatus(http.StatusUnauthorized)
+		valid, claims := token.VerifyToken(tokenString)
+		if !valid {
+			ReturnUnauthorized(c)
 		}
-		// Attach to Req
-		c.Set("user", user)
-		// Continue
-		c.Next()
-	} else {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		if len(c.Keys) == 0 {
+			c.Keys = make(map[string]interface{})
+		}
+		c.Keys["userId"] = claims.UserId
+		c.Keys["roles"] = claims.Roles
 	}
 }
 
-func AuthIsUser(c *gin.Context) {
-	// Get the cookie
-	tokenString, err := c.Cookie("Authorization")
-	if err != nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
-	}
-	// Decode and validate
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Don't forget to validate the alg is what you expect:
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-		}
-		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return []byte(os.Getenv("SECRET_KEY")), nil
-	})
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		// check the exp
-		if float64(time.Now().Unix()) > claims["exp"].(float64) {
-			c.AbortWithStatus(http.StatusUnauthorized)
-		}
-		// Find the user Token
-		var user models.User
-		result := initializers.DB.First(&user, "id = ?", claims["sub"])
-		if result.RowsAffected == 0 {
-			c.AbortWithStatus(http.StatusUnauthorized)
-		}
+func IsOwnerOrAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		id := c.Param("id")
-		if id != claims["sub"] {
-			c.AbortWithStatus(http.StatusUnauthorized)
+		userId := c.Keys["userId"]
+		userRoles := c.Keys["roles"]
+		roles := userRoles.([]string)
+		set := make(map[string]bool)
+		for _, v := range roles {
+			set[v] = true
 		}
-		// Continue
-		c.Next()
-	} else {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		_, ok := set["Admin"]
+		if id != userId && !ok {
+			ReturnUnauthorized(c)
+		} else if id == userId && !ok {
+			c.Next()
+		} else if id != userId && ok {
+			c.Next()
+		}
+	}
+}
+
+func Authorization(validRoles []string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if len(c.Keys) == 0 {
+			ReturnUnauthorized(c)
+		}
+		rolesVal := c.Keys["roles"]
+		if rolesVal == nil {
+			ReturnUnauthorized(c)
+		}
+		roles := rolesVal.([]string)
+		validation := make(map[string]bool)
+		for _, val := range roles {
+			validation[val] = true
+		}
+		for _, val := range validRoles {
+			if _, ok := validation[val]; !ok {
+				ReturnUnauthorized(c)
+			}
+		}
 	}
 }
