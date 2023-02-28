@@ -26,6 +26,13 @@ func ValidateToken() gin.HandlerFunc {
 		tokenString, err := c.Cookie("Authorization")
 		if err != nil {
 			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		if tokenString == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"status": "fail", "message": "You are not logged in",
+			})
+			return
 		}
 		valid, claims := token.VerifyToken(tokenString)
 		if !valid {
