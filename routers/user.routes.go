@@ -17,7 +17,6 @@ func NewUserRouteController(userController controllers.UserController) UserRoute
 
 func (rc *UserRouterController) UserRoute(rg *gin.RouterGroup) {
 	router := rg.Group("/user")
-
 	router.POST("/", rc.userController.CreateUser)
 	router.Use(middlewares.ValidateToken(), middlewares.IsOwnerOrAdmin())
 	router.PATCH("/:id", rc.userController.UpdateUser)

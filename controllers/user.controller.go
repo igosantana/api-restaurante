@@ -1,9 +1,9 @@
 package controllers
 
 import (
+	"api-restaurante/data/response"
 	"api-restaurante/initializers"
 	"api-restaurante/models"
-	"api-restaurante/utils"
 	"errors"
 	"fmt"
 	"net/http"
@@ -28,6 +28,14 @@ func NewUserController(DB *gorm.DB) UserController {
 	return UserController{DB}
 }
 
+// CreateUser  godoc
+// @Summary Create users
+// @Description Save users data in DB
+// @Param User body models.ToCreateUser true "Create user"
+// @Tags User
+// @Produce application/json
+// @Success 200 {object} response.Response{}
+// @Router /user [post]
 func (uc *UserController) CreateUser(c *gin.Context) {
 	var user models.User
 	var toCreateUser models.ToCreateUser
@@ -35,31 +43,33 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 	if err != nil {
 		var ve validator.ValidationErrors
 		if errors.As(err, &ve) {
-			out := make([]utils.ErrorMsg, len(ve))
+			out := make([]response.ErrorDetail, len(ve))
 			for i, fe := range ve {
-				out[i] = utils.ErrorMsg{Field: fe.Field(), Message: utils.GetErrorMsg(fe)}
+				out[i] = response.ErrorDetail{Field: fe.Field(), ErrorMessage: response.GetErrorMsg(fe), ErrorType: response.ErrorTypeValidation}
 			}
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"errors": out})
+			response.BadRequest(c, http.StatusBadRequest, "validation error", out)
 		}
 		return
 	}
 	result := initializers.DB.First(&user, "email = ?", toCreateUser.Email)
 	if result.RowsAffected > 0 {
-		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
-		errors = append(errors, models.ErrorDetail{
-			ErrorType:    models.ErrorTypeValidation,
-			ErrorMessage: fmt.Sprintf("Email already exists"),
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeValidation,
+			ErrorMessage: fmt.Sprintf("email already exists"),
 		})
-		utils.BadRequest(c, http.StatusBadRequest, "Email already exists", errors)
+		response.BadRequest(c, http.StatusBadRequest, "validation error", errors)
+		return
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(toCreateUser.Password), 10)
 	if err != nil {
-		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
-		errors = append(errors, models.ErrorDetail{
-			ErrorType:    models.ErrorTypeError,
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeError,
 			ErrorMessage: fmt.Sprintf("%v", err),
 		})
-		utils.BadRequest(c, http.StatusBadRequest, "Failed to hash password", errors)
+		response.BadRequest(c, http.StatusBadRequest, "failed to hash password", errors)
+		return
 	}
 	if toCreateUser.Email == "igo@admin.com" {
 		user.Roles = append(user.Roles, Admin)
@@ -73,90 +83,143 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 	user.Password = string(hash)
 	create := initializers.DB.Create(&user)
 	if create.Error != nil {
-		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
-		errors = append(errors, models.ErrorDetail{
-			ErrorType:    models.ErrorTypeError,
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeError,
 			ErrorMessage: fmt.Sprintf("%v", create.Error),
 		})
-		utils.BadRequest(c, http.StatusBadRequest, "Failed to create user", errors)
+		response.BadRequest(c, http.StatusBadRequest, "failed to create user", errors)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "User created!",
-	})
+	response.Ok(c, http.StatusOK, "success", nil)
 }
 
+// UpdateUser  godoc
+// @Summary Update users
+// @Description update user and save in DB. Only Admin or Owner.
+// @Tags User
+// @Param id path string true "update user by id"
+// @Param user body models.UserUpdate true "update user"
+// @Security cookieAuth
+// @Produce application/json
+// @Success 200 {object} response.Response{}
+// @Router /user/{id} [patch]
 func (uc *UserController) UpdateUser(c *gin.Context) {
 	var user models.User
 	var userUpdate models.UserUpdate
 	id := c.Param("id")
 	result := initializers.DB.First(&user, "id = ?", id)
 	if result.RowsAffected == 0 {
-		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
-		errors = append(errors, models.ErrorDetail{
-			ErrorType:    models.ErrorTypeError,
-			ErrorMessage: fmt.Sprintf("User not found"),
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeError,
+			ErrorMessage: fmt.Sprintf("user not found"),
 		})
-		utils.BadRequest(c, http.StatusBadRequest, "User not found", errors)
+		response.BadRequest(c, http.StatusNotFound, "user not found", errors)
+		return
 	}
 	err := c.BindJSON(&userUpdate)
 	if err != nil {
-		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
-		errors = append(errors, models.ErrorDetail{
-			ErrorType:    models.ErrorTypeError,
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeError,
 			ErrorMessage: fmt.Sprintf("%v", err),
 		})
-		utils.BadRequest(c, http.StatusBadRequest, "Error to read body", errors)
+		response.BadRequest(c, http.StatusBadRequest, "error to read body", errors)
+		return
 	}
-	initializers.DB.Model(&user).Updates(userUpdate.ToUpdateUserModel())
-	c.JSON(http.StatusOK, gin.H{
-		"message": "ok",
-	})
+	update := initializers.DB.Model(&user).Updates(userUpdate.ToUpdateUserModel())
+	if update.Error != nil {
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeError,
+			ErrorMessage: fmt.Sprintf("%v", update.Error),
+		})
+		response.BadRequest(c, http.StatusBadRequest, "failed to update user", errors)
+		return
+	}
+	response.Ok(c, http.StatusOK, "success", nil)
 }
 
+// DeleteUser  godoc
+// @Summary Delete users
+// @Description Remove users data by id. Only Admin or Owner.
+// @Tags User
+// @Param id path string true "remove user by id"
+// @Security cookieAuth
+// @Produce application/json
+// @Success 200 {object} response.Response{}
+// @Router /user/{id} [delete]
 func (uc *UserController) DeleteUser(c *gin.Context) {
 	var user models.User
 	id := c.Param("id")
 	result := initializers.DB.First(&user, "id = ?", id)
 	if result.RowsAffected == 0 {
-		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
-		errors = append(errors, models.ErrorDetail{
-			ErrorType:    models.ErrorTypeError,
-			ErrorMessage: fmt.Sprintf("User not found"),
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeError,
+			ErrorMessage: fmt.Sprintf("user not found"),
 		})
-		utils.BadRequest(c, http.StatusBadRequest, "User not found", errors)
+		response.BadRequest(c, http.StatusNotFound, "user not found", errors)
+		return
 	}
-	initializers.DB.Delete(&user)
+	delete := initializers.DB.Delete(&user)
+	if delete.Error != nil {
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeError,
+			ErrorMessage: fmt.Sprintf("%v", delete.Error),
+		})
+		response.BadRequest(c, http.StatusBadRequest, "failed to delete user", errors)
+		return
+	}
+	response.Ok(c, http.StatusOK, "success", nil)
 }
 
+// GetOneUser  godoc
+// @Summary Get one user
+// @Description Get user by id. Only Admin or Owner.
+// @Tags User
+// @Param id path string true "Get user by id"
+// @Security cookieAuth
+// @Produce application/json
+// @Success 200 {object} response.Response{}
+// @Router /user/{id} [get]
 func (uc *UserController) GetUser(c *gin.Context) {
 	var user models.User
 	id := c.Param("id")
 	result := initializers.DB.First(&user, "id = ?", id)
 	if result.RowsAffected == 0 {
-		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
-		errors = append(errors, models.ErrorDetail{
-			ErrorType:    models.ErrorTypeError,
-			ErrorMessage: fmt.Sprintf("User not found"),
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeError,
+			ErrorMessage: fmt.Sprintf("user not found"),
 		})
-		utils.BadRequest(c, http.StatusBadRequest, "User not found", errors)
+		response.BadRequest(c, http.StatusNotFound, "user not found", errors)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"user": user.UserToUser(),
-	})
+	response.Ok(c, http.StatusOK, "success", &user)
 }
 
+// GetAllUsers  godoc
+// @Summary Get all users
+// @Description Get all users. Only Admin.
+// @Tags User
+// @Security cookieAuth
+// @Produce application/json
+// @Success 200 {object} response.Response{}
+// @Router /user [get]
 func (uc *UserController) GetAllUsers(c *gin.Context) {
 	var users []models.User
 	result := initializers.DB.Find(&users)
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "User not found",
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeError,
+			ErrorMessage: fmt.Sprintf("user not found"),
 		})
+		response.BadRequest(c, http.StatusNotFound, "user not found", errors)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"data": &users,
-	})
+	response.Ok(c, http.StatusOK, "success", &users)
 }

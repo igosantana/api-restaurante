@@ -21,14 +21,14 @@ type User struct {
 }
 
 type ToCreateUser struct {
-	Name     string `json:"name" binding:"max=110"`
-	Email    string `json:"email" binding:"max=110,email"`
-	Password string `json:"password"`
+	Name     string `json:"name" binding:"max=110,required,min=3"`
+	Email    string `json:"email" binding:"max=110,email,required"`
+	Password string `json:"password" binding:"min=6,required,max=8"`
 }
 
 type UserLogin struct {
-	Email    string `json:"email" binding:"email"`
-	Password string `json:"password"`
+	Email    string `json:"email" binding:"email,required,max=110"`
+	Password string `json:"password" binding:"required,min=6,max=8"`
 }
 
 type UserUpdate struct {

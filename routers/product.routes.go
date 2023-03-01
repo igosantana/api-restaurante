@@ -2,6 +2,7 @@ package routers
 
 import (
 	"api-restaurante/controllers"
+	"api-restaurante/middlewares"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,8 +17,9 @@ func NewProductRouterController(productController controllers.ProductController)
 
 func (rc *ProductRouterController) ProductRoute(gr *gin.RouterGroup) {
 	router := gr.Group("/product")
+	router.GET("", rc.productController.GetAllProducts)
+	router.Use(middlewares.ValidateToken(), middlewares.Authorization([]string{controllers.Admin, controllers.Owner}))
 	router.POST("/", rc.productController.CreateProduct)
 	router.PATCH("/:id", rc.productController.UpdateProduct)
-	router.GET("/", rc.productController.GetAllProducts)
 	router.DELETE("/:id", rc.productController.DeleteProduct)
 }

@@ -1,10 +1,10 @@
 package controllers
 
 import (
+	"api-restaurante/data/response"
 	"api-restaurante/initializers"
 	"api-restaurante/models"
 	"api-restaurante/token"
-	"api-restaurante/utils"
 	"fmt"
 	"net/http"
 	"time"
@@ -22,34 +22,44 @@ func NewAuthController(DB *gorm.DB) AuthController {
 	return AuthController{DB}
 }
 
+// UserLogin	godoc
+// @Summary Users Login
+// @Description User Login. Set cookie with name `Authorization`. You need to include this cookie in subsequent requests.
+// @Tags Auth
+// @Produce application/json
+// @Success 200 {object} response.Response{}
+// @Router /auth/login [post]
 func (ac *AuthController) Login(c *gin.Context) {
 	var userLogin models.UserLogin
 	if err := c.BindJSON(&userLogin); err != nil {
-		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
-		errors = append(errors, models.ErrorDetail{
-			ErrorType:    models.ErrorTypeValidation,
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeValidation,
 			ErrorMessage: fmt.Sprintf("%v", err),
 		})
-		utils.BadRequest(c, http.StatusBadRequest, "Invalid request", errors)
+		response.BadRequest(c, http.StatusBadRequest, "invalid request", errors)
+		return
 	}
 	var user models.User
 	result := initializers.DB.First(&user, "email = ?", userLogin.Email)
 	if result.RowsAffected == 0 {
-		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
-		errors = append(errors, models.ErrorDetail{
-			ErrorType:    models.ErrorTypeValidation,
-			ErrorMessage: fmt.Sprintf("%v", "Invalid email or password"),
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeValidation,
+			ErrorMessage: fmt.Sprintf("%v", "invalid email or password"),
 		})
-		utils.BadRequest(c, http.StatusBadRequest, "Invalid email or password", errors)
+		response.BadRequest(c, http.StatusBadRequest, "credential error", errors)
+		return
 	}
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userLogin.Password))
 	if err != nil {
-		var errors []models.ErrorDetail = make([]models.ErrorDetail, 0, 1)
-		errors = append(errors, models.ErrorDetail{
-			ErrorType:    models.ErrorTypeValidation,
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeValidation,
 			ErrorMessage: fmt.Sprintf("%v", err),
 		})
-		utils.BadRequest(c, http.StatusBadRequest, "Invalid email or password", errors)
+		response.BadRequest(c, http.StatusBadRequest, "invalid email or password", errors)
+		return
 	}
 	var claims = &models.JwtClaims{}
 	claims.UserId = user.ID.String()
@@ -58,22 +68,26 @@ func (ac *AuthController) Login(c *gin.Context) {
 	var expirationTime = tokenCreationTime.Add(time.Duration(2) * time.Hour)
 	tokenString, err := token.GenerateToken(claims, expirationTime)
 	if err != nil {
-		utils.BadRequest(c, http.StatusBadRequest, "Error in generating token", []models.ErrorDetail{
-			{
-				ErrorType:    models.ErrorTypeError,
-				ErrorMessage: err.Error(),
-			},
+		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
+		errors = append(errors, response.ErrorDetail{
+			ErrorType:    response.ErrorTypeError,
+			ErrorMessage: fmt.Sprintf("%v", err),
 		})
+		response.BadRequest(c, http.StatusBadRequest, "failed to generate token", errors)
 	}
 	c.SetCookie("Authorization", tokenString, 3600*2, "", "", false, true)
-	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-	})
+	response.Ok(c, http.StatusOK, "success", nil)
 }
 
+// UserLogout	godoc
+// @Summary Users Logout
+// @Description Logout user.
+// @Tags Auth
+// @Security cookieAuth
+// @Produce application/json
+// @Success 200 {object} response.Response{}
+// @Router /auth/logout [get]
 func (ac *AuthController) LogoutUser(c *gin.Context) {
 	c.SetCookie("Authorization", "", -1, "", "", false, true)
-	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-	})
+	response.Ok(c, http.StatusOK, "success", nil)
 }

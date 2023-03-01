@@ -1,7 +1,7 @@
 package middlewares
 
 import (
-	"api-restaurante/models"
+	"api-restaurante/data/response"
 	"api-restaurante/token"
 	"net/http"
 
@@ -9,10 +9,10 @@ import (
 )
 
 func ReturnUnauthorized(c *gin.Context) {
-	c.AbortWithStatusJSON(http.StatusUnauthorized, models.Response{
-		Error: []models.ErrorDetail{
+	c.AbortWithStatusJSON(http.StatusUnauthorized, response.Response{
+		Error: []response.ErrorDetail{
 			{
-				ErrorType:    models.ErrorTypeUnauthorized,
+				ErrorType:    response.ErrorTypeUnauthorized,
 				ErrorMessage: "You are not authorized to access this path",
 			},
 		},

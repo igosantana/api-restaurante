@@ -1,0 +1,168 @@
+basePath: /api
+definitions:
+  models.ToCreateUser:
+    properties:
+      email:
+        maxLength: 110
+        type: string
+      name:
+        maxLength: 110
+        type: string
+      password:
+        type: string
+    type: object
+  models.UserUpdate:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+    type: object
+  response.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      status:
+        type: string
+    type: object
+host: localhost:3000
+info:
+  contact: {}
+  description: A Restaurant service API in Go using Gin framework
+  title: Restaurant service API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      description: User Login. Set cookie with name `Authorization`. You need to include
+        this cookie in subsequent requests.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Users Login
+      tags:
+      - Auth
+  /auth/logout:
+    get:
+      description: Logout user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - cookieAuth: []
+      summary: Users Logout
+      tags:
+      - Auth
+  /user:
+    get:
+      description: Get all users. Only Admin.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - cookieAuth: []
+      summary: Get all users
+      tags:
+      - User
+    post:
+      description: Save users data in DB
+      parameters:
+      - description: Create user
+        in: body
+        name: User
+        required: true
+        schema:
+          $ref: '#/definitions/models.ToCreateUser'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Create users
+      tags:
+      - User
+  /user/{id}:
+    delete:
+      description: Remove users data by id. Only Admin or Owner.
+      parameters:
+      - description: remove user by id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - cookieAuth: []
+      summary: Delete users
+      tags:
+      - User
+    get:
+      description: Get user by id. Only Admin or Owner.
+      parameters:
+      - description: Get user by id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - cookieAuth: []
+      summary: Get one user
+      tags:
+      - User
+    patch:
+      description: update user and save in DB. Only Admin or Owner.
+      parameters:
+      - description: update user by id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: update user
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.UserUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - cookieAuth: []
+      summary: Update users
+      tags:
+      - User
+swagger: "2.0"

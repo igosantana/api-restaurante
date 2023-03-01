@@ -17,7 +17,7 @@ func TestLogin(t *testing.T) {
 	fmt.Println("userMock", userMock)
 	defer DeleteUserMock(userMock.ID.String())
 	r := SetUpRouter()
-	r.POST("api/auth/login", AuthController.Login)
+	r.POST("/login", AuthController.Login)
 	userLogin := models.UserLogin{Email: userMock.Email, Password: "123456"}
 	jsonValue, err := json.Marshal(userLogin)
 	if err != nil {
@@ -34,7 +34,7 @@ func TestLogin(t *testing.T) {
 
 func TestLogout(t *testing.T) {
 	r := SetUpRouter()
-	r.GET("api/auth/logout", AuthController.LogoutUser)
+	r.GET("/logout", AuthController.LogoutUser)
 	req, err := http.NewRequest("GET", "/logout", nil)
 	if err != nil {
 		fmt.Println("new request error")

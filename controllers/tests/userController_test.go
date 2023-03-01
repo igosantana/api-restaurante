@@ -26,33 +26,25 @@ var (
 	UserRouteController routers.UserRouterController
 )
 
-func init() {
-	initializers.LoadEnvVariables()
-	initializers.ConnectToDB()
-
-	AuthController = controllers.NewAuthController(initializers.DB)
-	AuthRouteController = routers.NewAuthRouteController(AuthController)
-
-	UserController = controllers.NewUserController(initializers.DB)
-	UserRouteController = routers.NewUserRouteController(UserController)
-	server = gin.Default()
-}
-
 func SetUpRouter() *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
 	server = gin.Default()
 	return server
 }
 
 func TestMain(m *testing.M) {
-	router := server.Group("/api")
-	AuthRouteController.AuthRoute(router)
-	UserRouteController.UserRoute(router)
+	initializers.LoadEnvVariables()
+	initializers.ConnectToDB()
+
+	AuthController = controllers.NewAuthController(initializers.DB)
+	UserController = controllers.NewUserController(initializers.DB)
+	m.Run()
 }
 
 func CreateUserMock() models.User {
 	var userMock models.User
 	r := SetUpRouter()
-	r.POST("api/user", UserController.CreateUser)
+	r.POST("/user", UserController.CreateUser)
 	userCreate := models.ToCreateUser{Name: "test", Email: "test@email.com", Password: "123456"}
 	jsonValue, err := json.Marshal(userCreate)
 	if err != nil {
