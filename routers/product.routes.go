@@ -18,7 +18,7 @@ func NewProductRouterController(productController controllers.ProductController)
 func (rc *ProductRouterController) ProductRoute(gr *gin.RouterGroup) {
 	router := gr.Group("/product")
 	router.GET("", rc.productController.GetAllProducts)
-	router.Use(middlewares.ValidateToken(), middlewares.Authorization([]string{controllers.Admin, controllers.Owner}))
+	router.Use(middlewares.ValidateToken(), middlewares.Authorization([]string{controllers.Owner, controllers.Admin}))
 	router.POST("/", rc.productController.CreateProduct)
 	router.PATCH("/:id", rc.productController.UpdateProduct)
 	router.DELETE("/:id", rc.productController.DeleteProduct)

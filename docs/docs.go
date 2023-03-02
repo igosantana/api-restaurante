@@ -24,7 +24,49 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Users Login",
+                "summary": "Logs in and returns the authentication cookie",
+                "parameters": [
+                    {
+                        "description": "A JSON object containing the email and password.",
+                        "name": "Email/Password",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UserLogin"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The session ID is returned in a cookie named ` + "`" + `Authentication` + "`" + `. You need to include this cookie in subsequent requests.",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        },
+                        "headers": {
+                            "Set-Cookie": {
+                                "type": "string",
+                                "description": "example: Authorization=abcde12345; Path=/; HttpOnly"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/logout": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Logos out user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Users Logout",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -35,21 +77,142 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/logout": {
+        "/product": {
             "get": {
-                "security": [
-                    {
-                        "cookieAuth": []
-                    }
-                ],
-                "description": "Logout user.",
+                "description": "Get all products data in DB.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Auth"
+                    "Product"
                 ],
-                "summary": "Users Logout",
+                "summary": "Get all products",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Get products by name",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Get products by category",
+                        "name": "category",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A JSON with products",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Save products data in DB. Only Admin or Owner.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Product"
+                ],
+                "summary": "Create products",
+                "parameters": [
+                    {
+                        "description": "A JSON form object containing the products requirements",
+                        "name": "Product",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CreateProductForm"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/product/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Remove products data in DB. Only Admin or Owner.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Product"
+                ],
+                "summary": "Delete product",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Remove product by id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update and Save products data in DB. Only Admin or Owner.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Product"
+                ],
+                "summary": "Update products",
+                "parameters": [
+                    {
+                        "description": "A JSON form object containing the products requirements",
+                        "name": "Product",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UpdateProduct"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Update product by id.",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -223,8 +386,16 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "models.CreateProductForm": {
+            "type": "object"
+        },
         "models.ToCreateUser": {
             "type": "object",
+            "required": [
+                "email",
+                "name",
+                "password"
+            ],
             "properties": {
                 "email": {
                     "type": "string",
@@ -232,10 +403,54 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string",
+                    "maxLength": 110,
+                    "minLength": 3
+                },
+                "password": {
+                    "type": "string",
+                    "maxLength": 8,
+                    "minLength": 6
+                }
+            }
+        },
+        "models.UpdateProduct": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "maxLength": 110
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 250
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 110
+                },
+                "price": {
+                    "type": "number"
+                },
+                "quantity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.UserLogin": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
                     "maxLength": 110
                 },
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 8,
+                    "minLength": 6
                 }
             }
         },
@@ -253,15 +468,35 @@ const docTemplate = `{
                 }
             }
         },
+        "response.ErrorDetail": {
+            "type": "object",
+            "properties": {
+                "errorMessage": {
+                    "type": "string"
+                },
+                "errorType": {
+                    "type": "string"
+                },
+                "field": {
+                    "type": "string"
+                }
+            }
+        },
         "response.Response": {
             "type": "object",
             "properties": {
-                "code": {
-                    "type": "integer"
-                },
                 "data": {},
-                "status": {
+                "error": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.ErrorDetail"
+                    }
+                },
+                "message": {
                     "type": "string"
+                },
+                "status": {
+                    "type": "integer"
                 }
             }
         }

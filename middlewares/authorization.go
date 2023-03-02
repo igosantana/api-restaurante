@@ -82,7 +82,10 @@ func Authorization(validRoles []string) gin.HandlerFunc {
 			validation[val] = true
 		}
 		for _, val := range validRoles {
-			if _, ok := validation[val]; !ok {
+			if _, ok := validation[val]; ok {
+				c.Next()
+				break
+			} else {
 				ReturnUnauthorized(c)
 			}
 		}

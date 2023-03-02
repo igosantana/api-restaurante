@@ -23,11 +23,13 @@ func NewAuthController(DB *gorm.DB) AuthController {
 }
 
 // UserLogin	godoc
-// @Summary Users Login
+// @Summary Logs in and returns the authentication cookie
+// @Param Email/Password body models.UserLogin true "A JSON object containing the email and password."
 // @Description User Login. Set cookie with name `Authorization`. You need to include this cookie in subsequent requests.
 // @Tags Auth
-// @Produce application/json
-// @Success 200 {object} response.Response{}
+// @Produce 	application/json
+// @Success 200 {object} response.Response{} "The session ID is returned in a cookie named `Authentication`. You need to include this cookie in subsequent requests."
+// @Header 200 {string} Set-Cookie "example: Authorization=abcde12345; Path=/; HttpOnly"
 // @Router /auth/login [post]
 func (ac *AuthController) Login(c *gin.Context) {
 	var userLogin models.UserLogin
@@ -81,9 +83,9 @@ func (ac *AuthController) Login(c *gin.Context) {
 
 // UserLogout	godoc
 // @Summary Users Logout
-// @Description Logout user.
+// @Description Logos out user.
 // @Tags Auth
-// @Security cookieAuth
+// @Security ApiKeyAuth
 // @Produce application/json
 // @Success 200 {object} response.Response{}
 // @Router /auth/logout [get]

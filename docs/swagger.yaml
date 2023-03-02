@@ -1,5 +1,7 @@
 basePath: /api
 definitions:
+  models.CreateProductForm:
+    type: object
   models.ToCreateUser:
     properties:
       email:
@@ -7,9 +9,45 @@ definitions:
         type: string
       name:
         maxLength: 110
+        minLength: 3
         type: string
       password:
+        maxLength: 8
+        minLength: 6
         type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  models.UpdateProduct:
+    properties:
+      category:
+        maxLength: 110
+        type: string
+      description:
+        maxLength: 250
+        type: string
+      name:
+        maxLength: 110
+        type: string
+      price:
+        type: number
+      quantity:
+        type: integer
+    type: object
+  models.UserLogin:
+    properties:
+      email:
+        maxLength: 110
+        type: string
+      password:
+        maxLength: 8
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
     type: object
   models.UserUpdate:
     properties:
@@ -20,13 +58,26 @@ definitions:
       password:
         type: string
     type: object
+  response.ErrorDetail:
+    properties:
+      errorMessage:
+        type: string
+      errorType:
+        type: string
+      field:
+        type: string
+    type: object
   response.Response:
     properties:
-      code:
-        type: integer
       data: {}
-      status:
+      error:
+        items:
+          $ref: '#/definitions/response.ErrorDetail'
+        type: array
+      message:
         type: string
+      status:
+        type: integer
     type: object
 host: localhost:3000
 info:
@@ -39,19 +90,31 @@ paths:
     post:
       description: User Login. Set cookie with name `Authorization`. You need to include
         this cookie in subsequent requests.
+      parameters:
+      - description: A JSON object containing the email and password.
+        in: body
+        name: Email/Password
+        required: true
+        schema:
+          $ref: '#/definitions/models.UserLogin'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: The session ID is returned in a cookie named `Authentication`.
+            You need to include this cookie in subsequent requests.
+          headers:
+            Set-Cookie:
+              description: 'example: Authorization=abcde12345; Path=/; HttpOnly'
+              type: string
           schema:
             $ref: '#/definitions/response.Response'
-      summary: Users Login
+      summary: Logs in and returns the authentication cookie
       tags:
       - Auth
   /auth/logout:
     get:
-      description: Logout user.
+      description: Logos out user.
       produces:
       - application/json
       responses:
@@ -60,10 +123,102 @@ paths:
           schema:
             $ref: '#/definitions/response.Response'
       security:
-      - cookieAuth: []
+      - ApiKeyAuth: []
       summary: Users Logout
       tags:
       - Auth
+  /product:
+    get:
+      description: Get all products data in DB.
+      parameters:
+      - description: Get products by name
+        in: query
+        name: name
+        type: string
+      - description: Get products by category
+        in: query
+        name: category
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: A JSON with products
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Get all products
+      tags:
+      - Product
+    post:
+      consumes:
+      - multipart/form-data
+      description: Save products data in DB. Only Admin or Owner.
+      parameters:
+      - description: A JSON form object containing the products requirements
+        in: body
+        name: Product
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateProductForm'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create products
+      tags:
+      - Product
+  /product/{id}:
+    delete:
+      description: Remove products data in DB. Only Admin or Owner.
+      parameters:
+      - description: Remove product by id.
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete product
+      tags:
+      - Product
+    patch:
+      description: Update and Save products data in DB. Only Admin or Owner.
+      parameters:
+      - description: A JSON form object containing the products requirements
+        in: body
+        name: Product
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateProduct'
+      - description: Update product by id.
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update products
+      tags:
+      - Product
   /user:
     get:
       description: Get all users. Only Admin.

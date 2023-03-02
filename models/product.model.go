@@ -22,12 +22,12 @@ type Product struct {
 }
 
 type CreateProductForm struct {
-	Name        string                `form:"name" binding:"required,max=110"`
-	Description string                `form:"description" binding:"required,max=255"`
-	Price       string                `form:"price" binding:"required"`
-	Category    string                `form:"category" binding:"required,max=110"`
-	Quantity    string                `form:"quantity" binding:"required"`
-	File        *multipart.FileHeader `form:"file" binding:"required"`
+	Name        string                `json:"name" form:"name" binding:"required,max=110"`
+	Description string                `json:"description" form:"description" binding:"required,max=255"`
+	Price       string                `json:"price" form:"price" binding:"required"`
+	Category    string                `json:"category" form:"category" binding:"required,max=110"`
+	Quantity    string                `json:"quantity" form:"quantity" binding:"required"`
+	File        *multipart.FileHeader `json:"file" form:"file" binding:"required"`
 }
 
 type UpdateProduct struct {
@@ -38,12 +38,34 @@ type UpdateProduct struct {
 	Quantity    int     `json:"quantity,omitempty"`
 }
 
-func (p *UpdateProduct) ToUpdateProductModel() *Product {
+type ToGetAllProducts struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name,omitempty"`
+	Description string  `json:"description,omitempty"`
+	Price       float64 `json:"price,omitempty"`
+	Category    string  `json:"category,omitempty"`
+	Quantity    int     `json:"quantity,omitempty"`
+	ImageUrl    string  `json:"imageUrl,omitempty"`
+}
+
+func (up *UpdateProduct) ToUpdateProductModel() *Product {
 	return &Product{
+		Name:        up.Name,
+		Description: up.Description,
+		Price:       up.Price,
+		Category:    up.Category,
+		Quantity:    up.Quantity,
+	}
+}
+
+func (p *Product) ToGetAll() ToGetAllProducts {
+	return ToGetAllProducts{
+		ID:          p.ID.String(),
 		Name:        p.Name,
 		Description: p.Description,
 		Price:       p.Price,
 		Category:    p.Category,
 		Quantity:    p.Quantity,
+		ImageUrl:    p.Image,
 	}
 }

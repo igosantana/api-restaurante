@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -71,9 +72,11 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 		response.BadRequest(c, http.StatusBadRequest, "failed to hash password", errors)
 		return
 	}
-	if toCreateUser.Email == "igo@admin.com" {
+	admin := os.Getenv("ADMIN")
+	owner := os.Getenv("OWNER")
+	if toCreateUser.Email == admin {
 		user.Roles = append(user.Roles, Admin)
-	} else if toCreateUser.Email == "leo@email.com" {
+	} else if toCreateUser.Email == owner {
 		user.Roles = append(user.Roles, Owner)
 	} else {
 		user.Roles = append(user.Roles, Customer)
@@ -198,7 +201,7 @@ func (uc *UserController) GetUser(c *gin.Context) {
 		response.BadRequest(c, http.StatusNotFound, "user not found", errors)
 		return
 	}
-	response.Ok(c, http.StatusOK, "success", &user)
+	response.Ok(c, http.StatusOK, "success", user.UserToUser())
 }
 
 // GetAllUsers  godoc

@@ -1,8 +1,8 @@
 package controllers
 
 import (
-	"api-restaurante/awsBucket"
 	"api-restaurante/data/response"
+	"api-restaurante/helper"
 	"api-restaurante/initializers"
 	"api-restaurante/models"
 	"errors"
@@ -25,9 +25,19 @@ func NewProductController(DB *gorm.DB) ProductController {
 	return ProductController{DB}
 }
 
+// CreateProduct  godoc
+// @Summary Create products
+// @Description Save products data in DB. Only Admin or Owner.
+// @accept mpfd
+// @Param Product body models.CreateProductForm true "A JSON form object containing the products requirements"
+// @Tags Product
+// @Security ApiKeyAuth
+// @Produce application/json
+// @Success 200 {object} response.Response{}
+// @Router /product [post]
 func (pc *ProductController) CreateProduct(c *gin.Context) {
 	var form models.CreateProductForm
-	err := c.BindJSON(&form)
+	err := c.Bind(&form)
 	if err != nil {
 		var ve validator.ValidationErrors
 		if errors.As(err, &ve) {
@@ -39,8 +49,8 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 		}
 		return
 	}
-	imageUrl, error := awsBucket.UploadImage(form.File)
-	if error != nil {
+	imageUrl, err := helper.ImageUploadHelper(form.File)
+	if err != nil {
 		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
 		errors = append(errors, response.ErrorDetail{
 			ErrorType:    response.ErrorTypeError,
@@ -77,6 +87,16 @@ func (pc *ProductController) CreateProduct(c *gin.Context) {
 	response.Ok(c, http.StatusOK, "success", nil)
 }
 
+// UpdateProduct  godoc
+// @Summary Update products
+// @Description Update and Save products data in DB. Only Admin or Owner.
+// @Param Product body models.UpdateProduct true "A JSON form object containing the products requirements"
+// @Param id path string true "Update product by id."
+// @Tags Product
+// @Security ApiKeyAuth
+// @Produce application/json
+// @Success 200 {object} response.Response{}
+// @Router /product/{id} [patch]
 func (pc *ProductController) UpdateProduct(c *gin.Context) {
 	var updateProduct models.UpdateProduct
 	err := c.BindJSON(&updateProduct)
@@ -116,11 +136,20 @@ func (pc *ProductController) UpdateProduct(c *gin.Context) {
 	response.Ok(c, http.StatusOK, "success", nil)
 }
 
+// GetAllProducts  godoc
+// @Summary Get all products
+// @Description Get all products data in DB.
+// @Param name query string false "Get products by name"
+// @Param category query string false "Get products by category"
+// @Tags Product
+// @Produce application/json
+// @Success 200 {object} response.Response{} "A JSON with products"
+// @Router /product [get]
 func (pc *ProductController) GetAllProducts(c *gin.Context) {
-	var products []models.Product
+	var productsDB []models.Product
 	name := c.Query("name")
 	category := c.Query("category")
-	result := initializers.DB.Find(&products)
+	result := initializers.DB.Find(&productsDB)
 	if result.RowsAffected == 0 {
 		var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
 		errors = append(errors, response.ErrorDetail{
@@ -131,7 +160,7 @@ func (pc *ProductController) GetAllProducts(c *gin.Context) {
 		return
 	}
 	if name != "" {
-		result := initializers.DB.Find(&products, "name LIKE ?", fmt.Sprintf("%%%s%%", strings.ToLower(name)))
+		result := initializers.DB.Find(&productsDB, "name LIKE ?", fmt.Sprintf("%%%s%%", strings.ToLower(name)))
 		if result.RowsAffected == 0 {
 			var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
 			errors = append(errors, response.ErrorDetail{
@@ -143,7 +172,7 @@ func (pc *ProductController) GetAllProducts(c *gin.Context) {
 		}
 	}
 	if category != "" {
-		result := initializers.DB.Find(&products, "category = ?", strings.ToLower(category))
+		result := initializers.DB.Find(&productsDB, "category = ?", strings.ToLower(category))
 		if result.RowsAffected == 0 {
 			var errors []response.ErrorDetail = make([]response.ErrorDetail, 0, 1)
 			errors = append(errors, response.ErrorDetail{
@@ -154,9 +183,22 @@ func (pc *ProductController) GetAllProducts(c *gin.Context) {
 			return
 		}
 	}
-	response.Ok(c, http.StatusOK, "success", &products)
+	var allProducts []models.ToGetAllProducts
+	for _, product := range productsDB {
+		allProducts = append(allProducts, product.ToGetAll())
+	}
+	response.Ok(c, http.StatusOK, "success", &allProducts)
 }
 
+// DeleteProduct  godoc
+// @Summary Delete product
+// @Description Remove products data in DB. Only Admin or Owner.
+// @Param id path string true "Remove product by id."
+// @Tags Product
+// @Security ApiKeyAuth
+// @Produce application/json
+// @Success 200 {object} response.Response{}
+// @Router /product/{id} [delete]
 func (pc *ProductController) DeleteProduct(c *gin.Context) {
 	var product models.Product
 	id := c.Param("id")
