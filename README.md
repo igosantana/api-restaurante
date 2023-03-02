@@ -15,7 +15,7 @@ Juntas, estas bibliotecas facilitam a construção de um CRUD API robusto e efic
 - Docker compose (imagens do banco de dados e pgAdmin)
 - Insomnia (testes dos requests)
 
-=================================================ENGLISH ===================================================================================================
+ENGLISH
 
 # Personal Project 
 ### A restaurant/fast-food service API using Golang with Gin framework
