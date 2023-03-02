@@ -1,8 +1,6 @@
 # Projeto Pessoal 
 ### Uma API para um restaurante/hamburgueria utilizando Golang com o framework Gin
-Construir uma API RESTful CRUD(Create, Read, Update, Delete) com Golang, Gin e Gorm é um processo simples.
-Gin é um framework popular para construir APIs em Golang, e Gorm é uma biblioteca ORM(Object-Relational Mapping) para trabalhar com o banco de dados(Postgres) em Golang.
-Juntas, estas bibliotecas facilitam a construção de um CRUD API robusto e eficiente.
+Projeto modulado para desenvolver o Back-end de um restaurante ou hamburgueria comum, visando implementar as ferramentas normalmente utilizadas e acrescentar um espaço de coleção de dados do cliente. A ideia do projeto é poder resolver um problema de uma lanchonete, na qual os pedidos feitos no salão chegavam de forma desorganizada na cozinha. Por isso, o objetivo deste projeto é disponibilizar uma API segura e assertiva que melhore a administração da lanchonete.
 
 ## Ferramentas
 - Golang
@@ -19,9 +17,7 @@ Juntas, estas bibliotecas facilitam a construção de um CRUD API robusto e efic
 
 # Personal Project 
 ### A restaurant/fast-food service API using Golang with Gin framework
-Building a RESTful CRUD(Create, Read, Update, Delete) API with Golang, Gin, and Gorm is a straightforward process.
-Gin is a popular web framework for building APIs in Golang, and Gorm is an ORM(Object-Relational Mapping) library for working with databases in Golang.
-Together, these two libraries make it easy to build a robust and efficient CRUD API.
+A Modular project to develop the Back-end of a common restaurant or hamburgueria, aiming to implement the tools normally used and add a space for customer data collection. The idea of the project is to be able to solve a problem of a restaurant, in which the orders made in the lounge arrived in a disorganized way in the kitchen. Therefore, the goal of this project is to provide a secure and assertive API that improves the administration of the cafeteria.
 
 ## Tools
 - Golang
